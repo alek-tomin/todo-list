@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Список задач</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f4f5fb;--card:#ffffff;--text:#1f2433;--muted:#8a90a6;--line:#e8eaf3;
+  --accent:#5b6cf0;--accent-text:#ffffff;--danger:#e5484d;--shadow:0 10px 40px rgba(40,50,100,.10);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#12141c;--card:#1b1e2a;--text:#eceefa;--muted:#7f86a0;--line:#2a2e3e;
+    --accent:#7b88ff;--accent-text:#12141c;--danger:#ff6b70;--shadow:0 10px 40px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12141c;--card:#1b1e2a;--text:#eceefa;--muted:#7f86a0;--line:#2a2e3e;
+  --accent:#7b88ff;--accent-text:#12141c;--danger:#ff6b70;--shadow:0 10px 40px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  background:var(--bg);color:var(--text);min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+  display:flex;justify-content:center;padding:48px 16px;
+}
+.app{width:100%;max-width:520px}
+header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:14px}
+.theme{background:var(--card);border:1px solid var(--line);border-radius:12px;width:40px;height:40px;cursor:pointer;font-size:18px;color:var(--text)}
+.card{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:16px}
+.add{display:flex;gap:8px;margin-bottom:12px}
+.add input{
+  flex:1;min-width:0;padding:12px 14px;font-size:16px;border-radius:12px;
+  border:1px solid var(--line);background:transparent;color:var(--text);outline:none;
+}
+.add input:focus{border-color:var(--accent)}
+.add button{
+  padding:0 18px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-text);
+  font-size:15px;font-weight:600;cursor:pointer;
+}
+.add button:active{transform:scale(.97)}
+.filters{display:flex;gap:6px;margin:4px 0 8px}
+.filters button{
+  background:transparent;border:0;color:var(--muted);font-size:13px;font-weight:600;
+  padding:6px 10px;border-radius:8px;cursor:pointer;
+}
+.filters button.on{background:var(--bg);color:var(--text)}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--line)}
+li:first-child{border-top:0}
+.chk{
+  appearance:none;-webkit-appearance:none;flex:none;width:22px;height:22px;margin:0;cursor:pointer;
+  border:2px solid var(--muted);border-radius:7px;display:grid;place-content:center;transition:.15s;
+}
+.chk:checked{background:var(--accent);border-color:var(--accent)}
+.chk:checked::after{content:"";width:5px;height:10px;border:solid var(--accent-text);border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.txt{flex:1;min-width:0;word-break:break-word;font-size:16px;line-height:1.35}
+li.done .txt{text-decoration:line-through;color:var(--muted)}
+.del{
+  flex:none;background:transparent;border:0;color:var(--muted);font-size:20px;line-height:1;
+  width:32px;height:32px;border-radius:8px;cursor:pointer;
+}
+.del:hover{color:var(--danger);background:var(--bg)}
+.empty{text-align:center;color:var(--muted);padding:28px 0;font-size:15px}
+footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:12px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+footer button{background:transparent;border:0;color:var(--muted);font-size:13px;cursor:pointer}
+footer button:hover{color:var(--danger)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Список задач</h1>
+      <div class="sub" id="sub"></div>
+    </div>
+    <button class="theme" id="theme" aria-label="Сменить тему">◐</button>
+  </header>
+  <div class="card">
+    <div class="add">
+      <input id="input" type="text" placeholder="Новая задача…" maxlength="200" autocomplete="off">
+      <button id="addBtn">Добавить</button>
+    </div>
+    <div class="filters" id="filters">
+      <button data-f="all" class="on">Все</button>
+      <button data-f="active">Активные</button>
+      <button data-f="done">Выполненные</button>
+    </div>
+    <ul id="list"></ul>
+    <footer>
+      <span id="count"></span>
+      <button id="clear">Удалить выполненные</button>
+    </footer>
+  </div>
+</div>
+<script>
+(function(){
+  var KEY="todo-list-v1", THEME_KEY="todo-theme";
+  var tasks=[], filter="all";
+
+  function load(){
+    try{var r=localStorage.getItem(KEY);var p=r?JSON.parse(r):[];return Array.isArray(p)?p:[];}catch(e){return [];}
+  }
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(tasks));}catch(e){}}
+
+  function plural(n,a,b,c){
+    var m=n%10,h=n%100;
+    if(m===1&&h!==11)return a;
+    if(m>=2&&m<=4&&(h<10||h>=20))return b;
+    return c;
+  }
+
+  function render(){
+    var list=document.getElementById("list");
+    list.innerHTML="";
+    var shown=tasks.filter(function(t){
+      return filter==="all"||(filter==="done"?t.done:!t.done);
+    });
+    if(!shown.length){
+      var e=document.createElement("div");
+      e.className="empty";
+      e.textContent=tasks.length?"Здесь пока ничего нет":"Задач пока нет — добавьте первую ✨";
+      list.appendChild(e);
+    }
+    shown.forEach(function(t){
+      var li=document.createElement("li");
+      if(t.done)li.className="done";
+      var cb=document.createElement("input");
+      cb.type="checkbox";cb.className="chk";cb.checked=t.done;
+      cb.setAttribute("aria-label","Выполнено");
+      cb.onchange=function(){t.done=cb.checked;save();render();};
+      var sp=document.createElement("span");
+      sp.className="txt";sp.textContent=t.text;
+      var d=document.createElement("button");
+      d.className="del";d.innerHTML="×";d.setAttribute("aria-label","Удалить");
+      d.onclick=function(){tasks=tasks.filter(function(x){return x.id!==t.id;});save();render();};
+      li.appendChild(cb);li.appendChild(sp);li.appendChild(d);
+      list.appendChild(li);
+    });
+    var left=tasks.filter(function(t){return !t.done;}).length;
+    var doneN=tasks.length-left;
+    document.getElementById("count").textContent=
+      "Осталось: "+left+" "+plural(left,"задача","задачи","задач");
+    document.getElementById("sub").textContent=
+      tasks.length?("Выполнено "+doneN+" из "+tasks.length):"Начните с первой задачи";
+    document.getElementById("clear").style.visibility=doneN?"visible":"hidden";
+  }
+
+  function add(){
+    var inp=document.getElementById("input");
+    var text=inp.value.trim();
+    if(!text){inp.focus();return;}
+    tasks.unshift({id:Date.now()+Math.random().toString(16).slice(2),text:text,done:false});
+    inp.value="";save();render();inp.focus();
+  }
+
+  document.getElementById("addBtn").onclick=add;
+  document.getElementById("input").addEventListener("keydown",function(e){if(e.key==="Enter")add();});
+  document.getElementById("clear").onclick=function(){
+    tasks=tasks.filter(function(t){return !t.done;});save();render();
+  };
+  document.getElementById("filters").addEventListener("click",function(e){
+    var f=e.target.getAttribute("data-f");if(!f)return;
+    filter=f;
+    Array.prototype.forEach.call(this.children,function(b){b.classList.toggle("on",b===e.target);});
+    render();
+  });
+
+  // theme toggle
+  try{var th=localStorage.getItem(THEME_KEY);if(th)document.documentElement.setAttribute("data-theme",th);}catch(e){}
+  document.getElementById("theme").onclick=function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var isDark=cur?cur==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var next=isDark?"light":"dark";
+    document.documentElement.setAttribute("data-theme",next);
+    try{localStorage.setItem(THEME_KEY,next);}catch(e){}
+  };
+
+  tasks=load();render();
+})();
+</script>
+</body>
+</html>
